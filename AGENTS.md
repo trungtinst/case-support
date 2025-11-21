@@ -1,6 +1,6 @@
 # **AGENTS.md — Case Support (UDW Case Manager)**
 
-**Author:** Tin  
+**Author:** Tin Huynh
 **Purpose:** Technical specification for building a modular Case Support system inside the UDW plugin, following the Tin Structure.  
 **Scope:** WordPress module (custom tables + REST), admin UI, reminder engine, member profile integration.
 
