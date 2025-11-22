@@ -1,0 +1,62 @@
+name: Deploy Case Support Plugin
+
+on:
+  push:
+    branches:
+      - main
+      - work
+    paths:
+      - '**'
+  workflow_dispatch:
+
+env:
+  SOURCE_DIR: .
+  REMOTE_PATH: /home/uathub/htdocs/uathub.udwresourcecenter.org/wp-content/plugins/case-support/
+  RSYNC_EXCLUDES: |
+    --exclude '.git/'
+    --exclude '.github/'
+
+jobs:
+  deploy:
+    name: Sync to UAT
+    runs-on: ubuntu-latest
+    environment: UAT
+    concurrency:
+      group: deploy-case-support-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$REMOTE_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ensure remote path
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_PATH: ${{ env.REMOTE_PATH }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "$REMOTE_USER@$REMOTE_HOST" "mkdir -p '$REMOTE_PATH'"
+
+      - name: Deploy plugin via rsync
+        env:
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_PATH: ${{ env.REMOTE_PATH }}
+          SOURCE_DIR: ${{ env.SOURCE_DIR }}
+          RSYNC_EXCLUDES: ${{ env.RSYNC_EXCLUDES }}
+        run: |
+          if [ ! -d "$SOURCE_DIR" ]; then
+            echo "Source directory '$SOURCE_DIR' is missing" >&2
+            exit 1
+          fi
+          rsync -az --delete -e "ssh -o StrictHostKeyChecking=yes" $RSYNC_EXCLUDES "$SOURCE_DIR/" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH"
+          ssh -o StrictHostKeyChecking=yes "$REMOTE_USER@$REMOTE_HOST" "cd '$REMOTE_PATH' && find . -type d -print"
